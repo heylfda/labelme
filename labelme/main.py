@@ -1,5 +1,6 @@
 import argparse
 import codecs
+import logging
 import os
 import sys
 
@@ -9,17 +10,30 @@ from labelme import __appname__
 from labelme import __version__
 from labelme.app import MainWindow
 from labelme.config import get_config
-from labelme import logger
+from labelme.logger import logger
 from labelme.utils import newIcon
 
 
 def main():
+    try:
+        _main()
+    except Exception as e:
+        logger.error(e)
+
+
+def _main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--version', '-V', action='store_true', help='show version'
     )
     parser.add_argument(
         '--reset-config', action='store_true', help='reset qt config'
+    )
+    parser.add_argument(
+        '--logger-level',
+        default='info',
+        choices=['debug', 'info', 'warning', 'fatal', 'error'],
+        help='logger level',
     )
     parser.add_argument('filename', nargs='?', help='image or label filename')
     parser.add_argument(
@@ -93,6 +107,8 @@ def main():
         print('{0} {1}'.format(__appname__, __version__))
         sys.exit(0)
 
+    logger.setLevel(getattr(logging, args.logger_level.upper()))
+
     if hasattr(args, 'flags'):
         if os.path.isfile(args.flags):
             with codecs.open(args.flags, 'r', encoding='utf-8') as f:
@@ -140,7 +156,7 @@ def main():
     )
 
     if reset_config:
-        print('Resetting Qt config: %s' % win.settings.fileName())
+        logger.info('Resetting Qt config: %s' % win.settings.fileName())
         win.settings.clear()
         sys.exit(0)
 
@@ -149,5 +165,6 @@ def main():
     sys.exit(app.exec_())
 
 
+# this main block is required to generate executable by pyinstaller
 if __name__ == '__main__':
     main()

@@ -1,27 +1,37 @@
-<img src="labelme/icons/icon.png" align="right" />
+<h1 align="center">
+  <img src="labelme/icons/icon.png"><br/>labelme
+</h1>
 
-# labelme: Image Polygonal Annotation with Python
+<h4 align="center">
+  Image Polygonal Annotation with Python
+</h4>
 
-[![PyPI Version](https://img.shields.io/pypi/v/labelme.svg)](https://pypi.python.org/pypi/labelme)
-[![Python Versions](https://img.shields.io/pypi/pyversions/labelme.svg)](https://pypi.org/project/labelme)
-[![Travis Build Status](https://travis-ci.org/wkentaro/labelme.svg?branch=master)](https://travis-ci.org/wkentaro/labelme)
-[![Docker Build Status](https://img.shields.io/docker/build/wkentaro/labelme.svg)](https://hub.docker.com/r/wkentaro/labelme)
+<div align="center">
+  <a href="https://pypi.python.org/pypi/labelme"><img src="https://img.shields.io/pypi/v/labelme.svg"></a>
+  <a href="https://pypi.org/project/labelme"><img src="https://img.shields.io/pypi/pyversions/labelme.svg"></a>
+  <a href="https://travis-ci.org/wkentaro/labelme"><img src="https://travis-ci.org/wkentaro/labelme.svg?branch=master"></a>
+  <a href="https://hub.docker.com/r/wkentaro/labelme"><img src="https://img.shields.io/docker/build/wkentaro/labelme.svg"></a>
+</div>
 
+<br/>
+
+<div align="center">
+  <img src="examples/instance_segmentation/.readme/annotation.jpg" width="70%">
+</div>
+
+## Description
 
 Labelme is a graphical image annotation tool inspired by <http://labelme.csail.mit.edu>.  
 It is written in Python and uses Qt for its graphical interface.
 
-<img src="examples/instance_segmentation/.readme/annotation.jpg" width="80%" />
-<i>Fig 1. Annotation example of instance segmentation.</i>
-
 <img src="examples/instance_segmentation/data_dataset_voc/JPEGImages/2011_000006.jpg" width="19%" /> <img src="examples/instance_segmentation/data_dataset_voc/SegmentationClassPNG/2011_000006.png" width="19%" /> <img src="examples/instance_segmentation/data_dataset_voc/SegmentationClassVisualization/2011_000006.jpg" width="19%" /> <img src="examples/instance_segmentation/data_dataset_voc/SegmentationObjectPNG/2011_000006.png" width="19%" /> <img src="examples/instance_segmentation/data_dataset_voc/SegmentationObjectVisualization/2011_000006.jpg" width="19%" />  
-<i>Fig 2. VOC dataset example of instance segmentation.</i>
+<i>VOC dataset example of instance segmentation.</i>
 
-<img src="examples/semantic_segmentation/.readme/annotation.jpg" width="30%" /> <img src="examples/bbox_detection/.readme/annotation.jpg" width="32%" /> <img src="examples/classification/.readme/annotation_cat.jpg" width="33%" />  
-<i>Fig 3. Other examples (semantic segmentation, bbox detection, and classification).</i>
+<img src="examples/semantic_segmentation/.readme/annotation.jpg" width="32%" /> <img src="examples/bbox_detection/.readme/annotation.jpg" width="30%" /> <img src="examples/classification/.readme/annotation_cat.jpg" width="35%" />  
+<i>Other examples (semantic segmentation, bbox detection, and classification).</i>
 
 <img src="https://user-images.githubusercontent.com/4310419/47907116-85667800-de82-11e8-83d0-b9f4eb33268f.gif" width="30%" /> <img src="https://user-images.githubusercontent.com/4310419/47922172-57972880-deae-11e8-84f8-e4324a7c856a.gif" width="30%" /> <img src="https://user-images.githubusercontent.com/14256482/46932075-92145f00-d080-11e8-8d09-2162070ae57c.png" width="32%" />  
-<i>Fig 4. Various primitives (polygon, rectangle, circle, line, and point).</i>
+<i>Various primitives (polygon, rectangle, circle, line, and point).</i>
 
 
 ## Features
@@ -30,7 +40,8 @@ It is written in Python and uses Qt for its graphical interface.
 - [x] Image flag annotation for classification and cleaning. ([#166](https://github.com/wkentaro/labelme/pull/166))
 - [x] Video annotation. ([video annotation](examples/video_annotation))
 - [x] GUI customization (predefined labels / flags, auto-saving, label validation, etc). ([#144](https://github.com/wkentaro/labelme/pull/144))
-- [x] Exporting VOC-like dataset for semantic/instance segmentation. ([semantic segmentation](examples/semantic_segmentation), [instance segmentation](examples/instance_segmentation))
+- [x] Exporting VOC-format dataset for semantic/instance segmentation. ([semantic segmentation](examples/semantic_segmentation), [instance segmentation](examples/instance_segmentation))
+- [x] Exporting COCO-format dataset for instance segmentation. ([instance segmentation](examples/instance_segmentation))
 
 
 
@@ -149,6 +160,12 @@ For more advanced usage, please refer to the examples:
 * [Instance Segmentation Example](examples/instance_segmentation)
 * [Video Annotation Example](examples/video_annotation)
 
+### Command Line Arguemnts
+- `--output` specifies the location that annotations will be written to. If the location ends with .json, a single annotation will be written to this file. Only one image can be annotated if a location is specified with .json. If the location does not end with .json, the program will assume it is a directory. Annotations will be stored in this directory with a name that corresponds to the image that the annotation was made on.
+- The first time you run labelme, it will create a config file in `~/.labelmerc`. You can edit this file and the changes will be applied the next time that you launch labelme. If you would prefer to use a config file from another location, you can specify this file with the `--config` flag.
+- Without the `--nosortlabels` flag, the program will list labels in alphabetical order. When the program is run with this flag, it will display labels in the order that they are provided.
+- Flags are assigned to an entire image. [Example](examples/classification)
+- Labels are assigned to a single polygon. [Example](examples/bbox_detection)
 
 ## FAQ
 
@@ -156,11 +173,6 @@ For more advanced usage, please refer to the examples:
 - **How to load label PNG file?** See [examples/tutorial](examples/tutorial#how-to-load-label-png-file).
 - **How to get annotations for semantic segmentation?** See [examples/semantic_segmentation](examples/semantic_segmentation).
 - **How to get annotations for instance segmentation?** See [examples/instance_segmentation](examples/instance_segmentation).
-
-
-## Screencast
-
-<img src="https://drive.google.com/uc?id=1Ad-pn3mVM17eMDiMPYToVfzKFCaRQMdB" width="70%"/>
 
 
 ## Testing

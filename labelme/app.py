@@ -1,11 +1,8 @@
 import functools
-import io
 import os
 import os.path as osp
 import re
 import webbrowser
-
-import PIL.Image
 
 from qtpy import QtCore
 from qtpy.QtCore import Qt
@@ -16,18 +13,14 @@ from labelme import __appname__
 from labelme import PY2
 from labelme import QT5
 
+from . import utils
 from labelme.config import get_config
 from labelme.label_file import LabelFile
 from labelme.label_file import LabelFileError
-from labelme import logger
+from labelme.logger import logger
 from labelme.shape import DEFAULT_FILL_COLOR
 from labelme.shape import DEFAULT_LINE_COLOR
 from labelme.shape import Shape
-from labelme.utils import addActions
-from labelme.utils import fmtShortcut
-from labelme.utils import newAction
-from labelme.utils import newIcon
-from labelme.utils import struct
 from labelme.widgets import Canvas
 from labelme.widgets import ColorDialog
 from labelme.widgets import EscapableQListWidget
@@ -48,25 +41,8 @@ from labelme.widgets import ZoomWidget
 # - Zoom is too "steppy".
 
 
-class WindowMixin(object):
-    def menu(self, title, actions=None):
-        menu = self.menuBar().addMenu(title)
-        if actions:
-            addActions(menu, actions)
-        return menu
+class MainWindow(QtWidgets.QMainWindow):
 
-    def toolbar(self, title, actions=None):
-        toolbar = ToolBar(title)
-        toolbar.setObjectName('%sToolBar' % title)
-        # toolbar.setOrientation(Qt.Vertical)
-        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        if actions:
-            addActions(toolbar, actions)
-        self.addToolBar(Qt.LeftToolBarArea, toolbar)
-        return toolbar
-
-
-class MainWindow(QtWidgets.QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = 0, 1, 2
 
     def __init__(
@@ -202,7 +178,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.addDockWidget(Qt.RightDockWidgetArea, self.file_dock)
 
         # Actions
-        action = functools.partial(newAction, self)
+        action = functools.partial(utils.newAction, self)
         shortcuts = self._config['shortcuts']
         quit = action('&Quit', self.close, shortcuts['quit'], 'quit',
                       'Quit application')
@@ -231,6 +207,15 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         saveAs = action('&Save As', self.saveFileAs, shortcuts['save_as'],
                         'save-as', 'Save labels to a different file',
                         enabled=False)
+
+        deleteFile = action(
+            '&Delete File',
+            self.deleteFile,
+            shortcuts['delete_file'],
+            'delete',
+            'Delete current label file',
+            enabled=False)
+
         changeOutputDir = action(
             '&Change Output Dir',
             slot=self.changeOutputDirDialog,
@@ -348,11 +333,17 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         zoom = QtWidgets.QWidgetAction(self)
         zoom.setDefaultWidget(self.zoomWidget)
         self.zoomWidget.setWhatsThis(
-            "Zoom in or out of the image. Also accessible with"
-            " %s and %s from the canvas." %
-            (fmtShortcut('%s,%s' % (shortcuts['zoom_in'],
-                                    shortcuts['zoom_out'])),
-             fmtShortcut("Ctrl+Wheel")))
+            'Zoom in or out of the image. Also accessible with '
+            '{} and {} from the canvas.'
+            .format(
+                utils.fmtShortcut(
+                    '{},{}'.format(
+                        shortcuts['zoom_in'], shortcuts['zoom_out']
+                    )
+                ),
+                utils.fmtShortcut("Ctrl+Wheel"),
+            )
+        )
         self.zoomWidget.setEnabled(False)
 
         zoomIn = action('Zoom &In', functools.partial(self.addZoom, 10),
@@ -408,16 +399,17 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
         # Lavel list context menu.
         labelMenu = QtWidgets.QMenu()
-        addActions(labelMenu, (edit, delete))
+        utils.addActions(labelMenu, (edit, delete))
         self.labelList.setContextMenuPolicy(Qt.CustomContextMenu)
         self.labelList.customContextMenuRequested.connect(
             self.popLabelListMenu)
 
         # Store actions for further handling.
-        self.actions = struct(
+        self.actions = utils.struct(
             saveAuto=saveAuto,
             changeOutputDir=changeOutputDir,
             save=save, saveAs=saveAs, open=open_, close=close,
+            deleteFile=deleteFile,
             lineColor=color1, fillColor=color2,
             toggleKeepPrevMode=toggle_keep_prev_mode,
             delete=delete, edit=edit, copy=copy,
@@ -471,7 +463,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
 
         self.canvas.edgeSelected.connect(self.actions.addPoint.setEnabled)
 
-        self.menus = struct(
+        self.menus = utils.struct(
             file=self.menu('&File'),
             edit=self.menu('&Edit'),
             view=self.menu('&View'),
@@ -480,40 +472,59 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             labelList=labelMenu,
         )
 
-        addActions(self.menus.file, (open_, openNextImg, openPrevImg, opendir,
-                                     self.menus.recentFiles,
-                                     save, saveAs, saveAuto, changeOutputDir,
-                                     close,
-                                     None,
-                                     quit))
-        addActions(self.menus.help, (help,))
-        addActions(self.menus.view, (
-            self.flag_dock.toggleViewAction(),
-            self.label_dock.toggleViewAction(),
-            self.shape_dock.toggleViewAction(),
-            self.file_dock.toggleViewAction(),
-            None,
-            fill_drawing,
-            None,
-            hideAll,
-            showAll,
-            None,
-            zoomIn,
-            zoomOut,
-            zoomOrg,
-            None,
-            fitWindow,
-            fitWidth,
-            None,
-        ))
+        utils.addActions(
+            self.menus.file,
+            (
+                open_,
+                openNextImg,
+                openPrevImg,
+                opendir,
+                self.menus.recentFiles,
+                save,
+                saveAs,
+                saveAuto,
+                changeOutputDir,
+                close,
+                deleteFile,
+                None,
+                quit,
+            ),
+        )
+        utils.addActions(self.menus.help, (help,))
+        utils.addActions(
+            self.menus.view,
+            (
+                self.flag_dock.toggleViewAction(),
+                self.label_dock.toggleViewAction(),
+                self.shape_dock.toggleViewAction(),
+                self.file_dock.toggleViewAction(),
+                None,
+                fill_drawing,
+                None,
+                hideAll,
+                showAll,
+                None,
+                zoomIn,
+                zoomOut,
+                zoomOrg,
+                None,
+                fitWindow,
+                fitWidth,
+                None,
+            ),
+        )
 
         self.menus.file.aboutToShow.connect(self.updateFileMenu)
 
         # Custom context menu for the canvas widget:
-        addActions(self.canvas.menus[0], self.actions.menu)
-        addActions(self.canvas.menus[1], (
-            action('&Copy here', self.copyShape),
-            action('&Move here', self.moveShape)))
+        utils.addActions(self.canvas.menus[0], self.actions.menu)
+        utils.addActions(
+            self.canvas.menus[1],
+            (
+                action('&Copy here', self.copyShape),
+                action('&Move here', self.moveShape),
+            ),
+        )
 
         self.tools = self.toolbar('Tools')
         # Menu buttons on Left
@@ -523,6 +534,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             openNextImg,
             openPrevImg,
             save,
+            deleteFile,
             None,
             createMode,
             editMode,
@@ -605,6 +617,22 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         # if self.firstStart:
         #    QWhatsThis.enterWhatsThisMode()
 
+    def menu(self, title, actions=None):
+        menu = self.menuBar().addMenu(title)
+        if actions:
+            utils.addActions(menu, actions)
+        return menu
+
+    def toolbar(self, title, actions=None):
+        toolbar = ToolBar(title)
+        toolbar.setObjectName('%sToolBar' % title)
+        # toolbar.setOrientation(Qt.Vertical)
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        if actions:
+            utils.addActions(toolbar, actions)
+        self.addToolBar(Qt.LeftToolBarArea, toolbar)
+        return toolbar
+
     # Support Functions
 
     def noShapes(self):
@@ -613,9 +641,9 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
     def populateModeActions(self):
         tool, menu = self.actions.tool, self.actions.menu
         self.tools.clear()
-        addActions(self.tools, tool)
+        utils.addActions(self.tools, tool)
         self.canvas.menus[0].clear()
-        addActions(self.canvas.menus[0], menu)
+        utils.addActions(self.canvas.menus[0], menu)
         self.menus.edit.clear()
         actions = (
             self.actions.createMode,
@@ -626,13 +654,14 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             self.actions.createLineStripMode,
             self.actions.editMode,
         )
-        addActions(self.menus.edit, actions + self.actions.editMenu)
+        utils.addActions(self.menus.edit, actions + self.actions.editMenu)
 
     def setDirty(self):
         if self._config['auto_save'] or self.actions.saveAuto.isChecked():
             label_file = osp.splitext(self.imagePath)[0] + '.json'
             if self.output_dir:
-                label_file = osp.join(self.output_dir, label_file)
+                label_file_without_path = osp.basename(label_file)
+                label_file = osp.join(self.output_dir, label_file_without_path)
             self.saveLabels(label_file)
             return
         self.dirty = True
@@ -656,6 +685,11 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         if self.filename is not None:
             title = '{} - {}'.format(title, self.filename)
         self.setWindowTitle(title)
+
+        if self.hasLabelFile():
+            self.actions.deleteFile.setEnabled(True)
+        else:
+            self.actions.deleteFile.setEnabled(False)
 
     def toggleActions(self, value=True):
         """Enable/Disable widgets which depend on an opened image."""
@@ -787,7 +821,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         menu.clear()
         files = [f for f in self.recentFiles if f != current and exists(f)]
         for i, f in enumerate(files):
-            icon = newIcon('labels')
+            icon = utils.newIcon('labels')
             action = QtWidgets.QAction(
                 icon, '&%d %s' % (i + 1, QtCore.QFileInfo(f).fileName()), self)
             action.triggered.connect(functools.partial(self.loadRecent, f))
@@ -816,7 +850,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         if not self.canvas.editing():
             return
         item = item if item else self.currentItem()
-        text = self.labelDialog.popUp(item.text())
+        text = self.labelDialog.popUp(item.text() if item else None)
         if text is None:
             return
         if not self.validateLabel(text):
@@ -1064,16 +1098,6 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         for item, shape in self.labelList.itemsToShapes:
             item.setCheckState(Qt.Checked if value else Qt.Unchecked)
 
-    def convertImageDataToPng(self, imageData):
-        if imageData is None:
-            return
-        img = PIL.Image.open(io.BytesIO(imageData))
-        with io.BytesIO() as imgBytesIO:
-            img.save(imgBytesIO, "PNG")
-            imgBytesIO.seek(0)
-            data = imgBytesIO.read()
-        return data
-
     def loadFile(self, filename=None):
         """Load the specified file, or the last opened file if None."""
         # changing fileListWidget loads file
@@ -1097,23 +1121,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.status("Loading %s..." % osp.basename(str(filename)))
         label_file = osp.splitext(filename)[0] + '.json'
         if self.output_dir:
-            label_file = osp.join(self.output_dir, label_file)
+            label_file_without_path = osp.basename(label_file)
+            label_file = osp.join(self.output_dir, label_file_without_path)
         if QtCore.QFile.exists(label_file) and \
-                LabelFile.isLabelFile(label_file):
+                LabelFile.is_label_file(label_file):
             try:
                 self.labelFile = LabelFile(label_file)
-                # FIXME: PyQt4 installed via Anaconda fails to load JPEG
-                # and JSON encoded images.
-                # https://github.com/ContinuumIO/anaconda-issues/issues/131
-                if QtGui.QImage.fromData(self.labelFile.imageData).isNull():
-                    # tries to read image with PIL and convert it to PNG
-                    self.labelFile.imageData = self.convertImageDataToPng(
-                        self.labelFile.imageData)
-                if QtGui.QImage.fromData(self.labelFile.imageData).isNull():
-                    raise LabelFileError(
-                        'Failed loading image data from label file.\n'
-                        'Maybe this is a known issue of PyQt4 built on'
-                        ' Anaconda, and may be fixed by installing PyQt5.')
             except LabelFileError as e:
                 self.errorMessage(
                     'Error opening file',
@@ -1127,20 +1140,18 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                 osp.dirname(label_file),
                 self.labelFile.imagePath,
             )
-            self.lineColor = QtGui.QColor(*self.labelFile.lineColor)
-            self.fillColor = QtGui.QColor(*self.labelFile.fillColor)
+            if self.labelFile.lineColor is not None:
+                self.lineColor = QtGui.QColor(*self.labelFile.lineColor)
+            if self.labelFile.fillColor is not None:
+                self.fillColor = QtGui.QColor(*self.labelFile.fillColor)
             self.otherData = self.labelFile.otherData
         else:
-            # Load image:
-            # read data first and store for saving into label file.
-            self.imageData = read(filename, None)
-            if self.imageData is not None:
-                # the filename is image not JSON
+            self.imageData = LabelFile.load_image_file(filename)
+            if self.imageData:
                 self.imagePath = filename
-                if QtGui.QImage.fromData(self.imageData).isNull():
-                    self.imageData = self.convertImageDataToPng(self.imageData)
             self.labelFile = None
         image = QtGui.QImage.fromData(self.imageData)
+
         if image.isNull():
             formats = ['*.{}'.format(fmt.data().decode())
                        for fmt in QtGui.QImageReader.supportedImageFormats()]
@@ -1360,7 +1371,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         dlg.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
         dlg.setOption(QtWidgets.QFileDialog.DontConfirmOverwrite, False)
         dlg.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, False)
-        basename = osp.splitext(self.filename)[0]
+        basename = osp.basename(osp.splitext(self.filename)[0])
         if self.output_dir:
             default_labelfile_name = osp.join(
                 self.output_dir, basename + LabelFile.suffix
@@ -1391,6 +1402,32 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.canvas.setEnabled(False)
         self.actions.saveAs.setEnabled(False)
 
+    def getLabelFile(self):
+        if self.filename.lower().endswith('.json'):
+            label_file = self.filename
+        else:
+            label_file = osp.splitext(self.filename)[0] + '.json'
+
+        return label_file
+
+    def deleteFile(self):
+        mb = QtWidgets.QMessageBox
+        msg = 'You are about to permanently delete this label file, ' \
+              'proceed anyway?'
+        answer = mb.warning(self, 'Attention', msg, mb.Yes | mb.No)
+        if answer != mb.Yes:
+            return
+
+        label_file = self.getLabelFile()
+        if osp.exists(label_file):
+            os.remove(label_file)
+            logger.info('Label file is removed: {}'.format(label_file))
+
+            item = self.fileListWidget.currentItem()
+            item.setCheckState(Qt.Unchecked)
+
+            self.resetState()
+
     # Message Dialogs. #
     def hasLabels(self):
         if not self.labelList.itemsToShapes:
@@ -1399,6 +1436,13 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                 'You must label at least one object to save the file.')
             return False
         return True
+
+    def hasLabelFile(self):
+        if self.filename is None:
+            return False
+
+        label_file = self.getLabelFile()
+        return osp.exists(label_file)
 
     def mayContinue(self):
         if not self.dirty:
@@ -1524,11 +1568,12 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                 continue
             label_file = osp.splitext(filename)[0] + '.json'
             if self.output_dir:
-                label_file = osp.join(self.output_dir, label_file)
+                label_file_without_path = osp.basename(label_file)
+                label_file = osp.join(self.output_dir, label_file_without_path)
             item = QtWidgets.QListWidgetItem(filename)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             if QtCore.QFile.exists(label_file) and \
-                    LabelFile.isLabelFile(label_file):
+                    LabelFile.is_label_file(label_file):
                 item.setCheckState(Qt.Checked)
             else:
                 item.setCheckState(Qt.Unchecked)
@@ -1547,11 +1592,3 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
                     images.append(relativePath)
         images.sort(key=lambda x: x.lower())
         return images
-
-
-def read(filename, default=None):
-    try:
-        with open(filename, 'rb') as f:
-            return f.read()
-    except Exception:
-        return default

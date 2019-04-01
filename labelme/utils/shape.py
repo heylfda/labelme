@@ -4,7 +4,7 @@ import numpy as np
 import PIL.Image
 import PIL.ImageDraw
 
-from labelme import logger
+from labelme.logger import logger
 
 
 def polygons_to_mask(img_shape, polygons, shape_type=None):
@@ -63,7 +63,7 @@ def shapes_to_label(img_shape, shapes, label_name_to_value, type='class'):
             cls_name = label.split('-')[0]
             if label not in instance_names:
                 instance_names.append(label)
-            ins_id = len(instance_names) - 1
+            ins_id = instance_names.index(label)
         cls_id = label_name_to_value[cls_name]
         mask = shape_to_mask(img_shape[:2], points, shape_type)
         cls[mask] = cls_id

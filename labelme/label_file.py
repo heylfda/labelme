@@ -1,11 +1,15 @@
 import base64
+import io
 import json
-import os.path
+import os.path as osp
 
-from . import logger
-from . import PY2
-from . import utils
-from ._version import __version__
+import PIL.Image
+
+from labelme._version import __version__
+from labelme.logger import logger
+from labelme import PY2
+from labelme import QT4
+from labelme import utils
 
 
 class LabelFileError(Exception):
@@ -24,6 +28,29 @@ class LabelFile(object):
             self.load(filename)
         self.filename = filename
 
+    @staticmethod
+    def load_image_file(filename):
+        try:
+            image_pil = PIL.Image.open(filename)
+        except IOError:
+            logger.error('Failed opening image file: {}'.format(filename))
+            return
+
+        # apply orientation to image according to exif
+        image_pil = utils.apply_exif_orientation(image_pil)
+
+        with io.BytesIO() as f:
+            ext = osp.splitext(filename)[1].lower()
+            if PY2 and QT4:
+                format = 'PNG'
+            elif ext in ['.jpg', '.jpeg']:
+                format = 'JPEG'
+            else:
+                format = 'PNG'
+            image_pil.save(f, format=format)
+            f.seek(0)
+            return f.read()
+
     def load(self, filename):
         keys = [
             'imageData',
@@ -40,12 +67,12 @@ class LabelFile(object):
                 data = json.load(f)
             if data['imageData'] is not None:
                 imageData = base64.b64decode(data['imageData'])
+                if PY2 and QT4:
+                    imageData = utils.img_data_to_png_data(imageData)
             else:
                 # relative path from label file to relative path from cwd
-                imagePath = os.path.join(os.path.dirname(filename),
-                                         data['imagePath'])
-                with open(imagePath, 'rb') as f:
-                    imageData = f.read()
+                imagePath = osp.join(osp.dirname(filename), data['imagePath'])
+                imageData = self.load_image_file(imagePath)
             flags = data.get('flags')
             imagePath = data['imagePath']
             self._check_image_height_and_width(
@@ -143,5 +170,5 @@ class LabelFile(object):
             raise LabelFileError(e)
 
     @staticmethod
-    def isLabelFile(filename):
-        return os.path.splitext(filename)[1].lower() == LabelFile.suffix
+    def is_label_file(filename):
+        return osp.splitext(filename)[1].lower() == LabelFile.suffix
